@@ -49,7 +49,7 @@ def generate_plot(metrics_list, metrics_data):
     # Map metrics back to input
 
     # Create plot
-    fig = make_subplots(rows=2, cols=1, specs=[[{"secondary_y": True}], [{"secondary_y": False}]],
+    fig = make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}], [{"secondary_y": False}]],
                         row_width=[0.2, 0.8], shared_xaxes=True)
     fig.update_layout(title="Email Metrics", xaxis_rangeslider_visible=False)
 
@@ -89,11 +89,15 @@ def get_color(index):
     return color
 
 
-def send_email(api_key, template_id, recipient_address, file_path):
+def send_email(api_key, template_id, recipient_address, file_path, substitution_data=None):
 
     # Retrieve Template Content
     template_data = get_template(api_key, template_id)
     template_obj = Template(template_data)
+
+    # Set Defaults
+    if substitution_data is None:
+        substitution_data = {}
 
     # Send Message
     sp = SparkPost(api_key)
@@ -109,7 +113,8 @@ def send_email(api_key, template_id, recipient_address, file_path):
             "name": os.path.basename(file_path),
             "type": "image/png",
             "data": img_obj
-        }]
+        }],
+        substitution_data=substitution_data
     )
 
 
@@ -131,19 +136,27 @@ def base64_img(file_path):
     return img_obj
 
 
-if __name__ == "__main__":
-    # Initialize Variables
-    api_key = os.environ.get("API_KEY")
-    recipient_address = os.environ.get("RECIPIENT_ADDRESS")
-    template_id = "analytics-email"
+def send_analytics_report(**kwargs):
+    """
+    Generate Analytics Report Email
 
-    metrics_list = [
-        "count_injected",
-        "count_delivered",
-        "count_rendered"
-    ]
-    filters = []
-    comparisons = []
+    :param str api_key:  SparkPost API Key
+    :param str recipient_address:  Recipient address to send email to
+    :param str template_id:  SparkPost Stored Template ID
+    :param str logo_url:  URL of logo to include in the email body
+    :param metrics_list:  List of strings
+    :param filters:  List of strings
+    :param comparisons:  List of strings
+    :return: None
+    """
+
+    api_key = kwargs.get("api_key")
+    recipient_address = kwargs.get("recipient_address")
+    template_id = kwargs.get("template_id")
+    logo_url = kwargs.get("logo_url")
+    metrics_list = kwargs.get("metrics_list")
+    filters = kwargs.get("filters")
+    comparisons = kwargs.get("comparisons")
 
     # Map Metrics to determine which raw metrics are needed
     metrics_csv = ",".join(metrics_list)
@@ -159,4 +172,32 @@ if __name__ == "__main__":
     file_path = generate_plot(metrics_list, metrics_data)
 
     # Send Email
-    send_email(api_key, template_id, recipient_address, file_path)
+    substitution_data = {
+        "logo_img": logo_url
+    }
+    send_email(api_key, template_id, recipient_address, file_path, substitution_data)
+
+
+if __name__ == "__main__":
+    # Initialize Variables
+    api_key = os.environ.get("API_KEY")
+    recipient_address = os.environ.get("RECIPIENT_ADDRESS")
+    template_id = os.environ.get("TEMPLATE_ID")
+    logo_url = os.environ.get("LOGO_URL")
+
+    metrics_list = [
+        "count_injected",
+        "count_delivered",
+        "count_rendered"
+    ]
+    filters = []
+    comparisons = []
+
+    # Send Report Email
+    send_analytics_report(
+        api_key=api_key,
+        recipient_address=recipient_address,
+        template_id=template_id,
+        logo_url=logo_url,
+        metrics_list=metrics_list
+    )
